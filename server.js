@@ -5,14 +5,18 @@ require('dotenv').config();
 
 const app = express();
 
-// Configurazione CORS
+// Configurazione CORS aggiornata
 app.use(cors({
   origin: [
     'https://sendcloud-pricing-tool-frontend-hg2x.vercel.app',
-    'http://localhost:3000'
+    'http://localhost:3000',
+    'https://sendcloud-pricing-tool-backend.onrender.com'
   ],
-  methods: ['GET', 'POST'],
-  credentials: true
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: false,
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }));
 
 app.use(express.json());
