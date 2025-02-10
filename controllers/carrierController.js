@@ -62,8 +62,7 @@ const analyzeTariffs = async (req, res) => {
     const { monthlyShipments, averageWeight, isVolumetric, verticalMarket, currentCourier } = req.body;
     const carriers = await Carrier.find();
     
-    const carrierData = carriers;
-
+    // Chiedi all'IA solo per la raccomandazione iniziale
     const message = await anthropic.messages.create({
       model: "claude-3-5-sonnet-20241022",
       max_tokens: 1000,
@@ -105,7 +104,7 @@ Provide a response in JSON format with this structure:
 }
 
 Carriers Data:
-${JSON.stringify(carrierData, null, 2)}
+${JSON.stringify(carriers, null, 2)}
 
 The response must be ONLY the JSON, without any other text.`
       }]
@@ -113,14 +112,26 @@ The response must be ONLY the JSON, without any other text.`
 
     const recommendation = JSON.parse(message.content[0].text);
     
-    // Add information for frontend
-    const response = {
-      ...recommendation,
-      availableCarriers: carriers.map(carrier => ({
-        id: carrier._id,
-        name: carrier.name
+    // Prepara i dati di tutti i corrieri disponibili
+    const carriersData = carriers.map(carrier => ({
+      id: carrier._id,
+      name: carrier.name,
+      services: carrier.services.map(service => ({
+        range: `${service.weightRange.min}-${service.weightRange.max}kg`,
+        retailPrice: service.pricing.retailPrice,
+        purchasePrice: service.pricing.purchasePrice,
+        margin: service.pricing.margin,
+        weightRange: service.weightRange
       })),
-      maxDiscount: recommendation.margin * 0.9 // Add maximum applicable discount
+      fuelSurcharge: carrier.fuelSurcharge,
+      isVolumetric: carrier.isVolumetric
+    }));
+
+    const response = {
+      recommendation,
+      carriersData,
+      monthlyShipments,
+      maxDiscount: recommendation.margin * 0.9
     };
     
     res.json(response);
