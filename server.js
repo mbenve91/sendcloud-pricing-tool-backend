@@ -32,6 +32,12 @@ mongoose.connect(process.env.MONGODB_URI)
 // Use routes
 app.use('/api/carriers', carrierRoutes);
 
+// Aggiungi un log per debug
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.url}`);
+  next();
+});
+
 // Base route
 app.get('/', (req, res) => {
   res.json({ message: 'Welcome to Sendcloud Pricing Tool API' });
