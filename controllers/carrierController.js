@@ -110,9 +110,23 @@ The response must be ONLY the JSON, without any other text.`
       }]
     });
 
-    const recommendation = JSON.parse(message.content[0].text);
+    const aiRecommendation = JSON.parse(message.content[0].text);
     
-    // Prepara i dati di tutti i corrieri disponibili
+    // Trova il corriere e il servizio raccomandato
+    const recommendedCarrier = carriers.find(c => c.name === aiRecommendation.carrierName);
+    const recommendedService = recommendedCarrier?.services.find(s => 
+      averageWeight >= s.weightRange.min && averageWeight <= s.weightRange.max
+    );
+
+    // Prepara la raccomandazione con tutti i dati necessari
+    const recommendation = {
+      ...aiRecommendation,
+      weightRange: recommendedService?.weightRange || { min: 0, max: 0 },
+      fuelSurcharge: recommendedCarrier?.fuelSurcharge || 0,
+      isVolumetric: recommendedCarrier?.isVolumetric || false
+    };
+
+    // Prepara i dati di tutti i corrieri
     const carriersData = carriers.map(carrier => ({
       id: carrier._id,
       name: carrier.name,
@@ -131,7 +145,11 @@ The response must be ONLY the JSON, without any other text.`
       recommendation,
       carriersData,
       monthlyShipments,
-      maxDiscount: recommendation.margin * 0.9
+      maxDiscount: recommendation.margin * 0.9,
+      availableCarriers: carriers.map(c => ({
+        id: c._id,
+        name: c.name
+      }))
     };
     
     res.json(response);
