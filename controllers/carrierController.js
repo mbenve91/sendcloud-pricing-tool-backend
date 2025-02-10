@@ -69,61 +69,65 @@ const analyzeTariffs = async (req, res) => {
       max_tokens: 1000,
       messages: [{
         role: "user",
-        content: `Analizza queste informazioni per trovare la migliore tariffa di spedizione e fornisci una risposta in formato JSON con la seguente struttura:
+        content: `Analyze this shipping information to find the best rate, considering that:
 
+1. The suggested price should be an optimal compromise between:
+   - Maximizing company margin
+   - Attractive savings for the prospect
+   - Long-term sustainability of the business relationship
+
+2. Sales can apply up to 90% discount on margin to close the deal, but the suggested price should already be competitive without requiring excessive discounts.
+
+3. Consider:
+   - Monthly volume: ${monthlyShipments} shipments
+   - Average weight: ${averageWeight}kg
+   - Market: ${verticalMarket}
+   - Current courier: ${currentCourier}
+   - Volumetric requirements: ${isVolumetric ? 'Yes' : 'No'}
+
+Provide a response in JSON format with this structure:
 {
-  "carrierName": "nome del corriere consigliato",
-  "serviceName": "nome del servizio specifico",
-  "basePrice": numero,
-  "suggestedPrice": numero,
-  "purchasePrice": numero,
-  "margin": numero,
-  "monthlyProfit": numero,
-  "monthlySavings": numero,
+  "carrierName": "recommended carrier name",
+  "serviceName": "specific service name",
+  "basePrice": number,
+  "suggestedPrice": number,
+  "purchasePrice": number,
+  "margin": number,
+  "monthlyProfit": number,
+  "monthlySavings": number,
   "weightRange": {
-    "min": numero,
-    "max": numero
+    "min": number,
+    "max": number
   },
-  "fuelSurcharge": numero,
+  "fuelSurcharge": number,
   "isVolumetric": boolean,
-  "explanation": "breve spiegazione della scelta"
+  "explanation": "Explain why this is the optimal solution, including the reasoning behind the suggested price"
 }
 
-Dati Cliente:
-- Spedizioni mensili: ${monthlyShipments}
-- Peso medio: ${averageWeight}kg
-- Mercato verticale: ${verticalMarket}
-- Corriere attuale: ${currentCourier}
-- Richiede peso volumetrico: ${isVolumetric ? 'Sì' : 'No'}
-
-Dati Corrieri:
+Carriers Data:
 ${JSON.stringify(carrierData, null, 2)}
 
-Considera:
-1. Compatibilità del peso con i range disponibili
-2. Supporto per peso volumetrico se richiesto
-3. Massimizzazione del margine mensile considerando:
-   - Prezzo di acquisto (purchasePrice)
-   - Prezzo di vendita suggerito (suggestedPrice)
-   - Sovrattassa carburante (fuelSurcharge)
-4. Competitività rispetto al corriere attuale
-5. Specifiche esigenze del mercato verticale
-6. Calcola:
-   - monthlyProfit = (suggestedPrice - purchasePrice) * monthlyShipments
-   - monthlySavings = confronto con i prezzi del corriere attuale
-
-La risposta deve essere SOLO il JSON, senza altro testo.`
+The response must be ONLY the JSON, without any other text.`
       }]
     });
 
-    // Parse la risposta JSON di Claude
     const recommendation = JSON.parse(message.content[0].text);
     
-    res.json(recommendation);
+    // Add information for frontend
+    const response = {
+      ...recommendation,
+      availableCarriers: carriers.map(carrier => ({
+        id: carrier._id,
+        name: carrier.name
+      })),
+      maxDiscount: recommendation.margin * 0.9 // Add maximum applicable discount
+    };
+    
+    res.json(response);
   } catch (error) {
-    console.error('Errore nell\'analisi delle tariffe:', error);
+    console.error('Error analyzing tariffs:', error);
     res.status(500).json({ 
-      message: 'Errore nell\'analisi delle tariffe',
+      message: 'Error analyzing tariffs',
       error: error.message 
     });
   }
