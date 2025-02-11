@@ -142,7 +142,12 @@ The response must be ONLY the JSON, without any other text.`
     }));
 
     const response = {
-      recommendation,
+      recommendation: {
+        ...aiRecommendation,
+        weightRange: recommendedService?.weightRange || { min: 0, max: 0 },
+        fuelSurcharge: recommendedCarrier?.fuelSurcharge || 0,
+        isVolumetric: recommendedCarrier?.isVolumetric || false
+      },
       carriersData,
       monthlyShipments,
       maxDiscount: recommendation.margin * 0.9,
