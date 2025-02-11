@@ -14,10 +14,19 @@ app.use(cors({
   ],
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: false,
-  preflightContinue: false,
+  credentials: true,
+  exposedHeaders: ['Access-Control-Allow-Origin'],
   optionsSuccessStatus: 204
 }));
+
+// Aggiungi middleware per gestire gli header CORS
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', 'https://sendcloud-pricing-tool-frontend-hg2x.vercel.app');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  next();
+});
 
 app.use(express.json());
 
