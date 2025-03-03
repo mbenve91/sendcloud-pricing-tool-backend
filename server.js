@@ -22,7 +22,7 @@ app.use(cors({
 app.use(express.json());
 
 // Import routes
-const carrierRoutes = require('./routes/carrierRoutes');
+const carrierRoutes = require('./routes/carrier.routes');
 
 // MongoDB connection
 mongoose.connect(process.env.MONGODB_URI)
@@ -30,7 +30,7 @@ mongoose.connect(process.env.MONGODB_URI)
   .catch(err => console.error('Could not connect to MongoDB:', err));
 
 // Use routes
-app.use('/api/carriers', carrierRoutes);
+app.use('/api', carrierRoutes);
 
 // Aggiungi un log per debug
 app.use((req, res, next) => {
