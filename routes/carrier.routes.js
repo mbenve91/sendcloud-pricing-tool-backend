@@ -1,12 +1,36 @@
 const express = require('express');
 const router = express.Router();
 const Carrier = require('../models/carrier');
+const multer = require('multer');
+const csv = require('csv-parser');
+const fs = require('fs');
+const path = require('path');
 
-/**
- * @route   GET /api/carriers
- * @desc    Ottiene tutti i corrieri attivi
- * @access  Public
- */
+// Configurazione di multer per il caricamento dei file
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = path.join(__dirname, '../uploads');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    cb(null, `${Date.now()}-${file.originalname}`);
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  fileFilter: function (req, file, cb) {
+    if (file.mimetype !== 'text/csv') {
+      return cb(new Error('Solo file CSV sono supportati'), false);
+    }
+    cb(null, true);
+  }
+});
+
+// Ottieni tutti i corrieri attivi
 router.get('/carriers', async (req, res) => {
   try {
     const carriers = await Carrier.find({ isActive: true });
@@ -16,11 +40,7 @@ router.get('/carriers', async (req, res) => {
   }
 });
 
-/**
- * @route   GET /api/carriers/:id
- * @desc    Ottiene dettagli di un singolo corriere
- * @access  Public
- */
+// Ottieni dettagli di un singolo corriere
 router.get('/carriers/:id', async (req, res) => {
   try {
     const carrier = await Carrier.findById(req.params.id);
@@ -31,12 +51,7 @@ router.get('/carriers/:id', async (req, res) => {
   }
 });
 
-/**
- * @route   GET /api/compare-rates
- * @desc    Confronta le tariffe dei corrieri in base ai filtri
- * @access  Public
- * @params  weight, destinationType, countryCode, volume, carrierIds, serviceTypes
- */
+// Confronta le tariffe dei corrieri in base ai filtri
 router.get('/compare-rates', async (req, res) => {
   try {
     const { 
@@ -56,13 +71,13 @@ router.get('/compare-rates', async (req, res) => {
     // Costruisci la query per filtrare i corrieri
     const query = { isActive: true };
     if (carrierIds && carrierIds.length > 0) {
-      query._id = { $in: carrierIds.split(',') };
+      query._id = { $in: carrierIds };
     }
     
     // Filtra i servizi se specificati
     let serviceFilter = {};
     if (serviceTypes && serviceTypes.length > 0) {
-      serviceFilter = { 'services.name': { $in: serviceTypes.split(',') } };
+      serviceFilter = { 'services.name': { $in: serviceTypes } };
     }
     
     // Ottieni tutti i corrieri che soddisfano i criteri
@@ -77,8 +92,7 @@ router.get('/compare-rates', async (req, res) => {
         if (!service.destinationTypes.includes(destinationType)) return;
         
         // Verifica se ci sono filtri per tipo di servizio
-        if (serviceTypes && serviceTypes.length > 0 && 
-            !serviceTypes.split(',').includes(service.name)) return;
+        if (serviceTypes && serviceTypes.length > 0 && !serviceTypes.includes(service.name)) return;
         
         // Calcola il prezzo finale
         const priceDetails = carrier.calculateFinalPrice(
@@ -116,12 +130,7 @@ router.get('/compare-rates', async (req, res) => {
   }
 });
 
-/**
- * @route   GET /api/ai-suggestions
- * @desc    Ottiene suggerimenti AI per migliorare le tariffe
- * @access  Public
- * @params  weight, destinationType, volume
- */
+// Ottieni suggerimenti AI per migliorare le tariffe
 router.get('/ai-suggestions', async (req, res) => {
   try {
     const { weight, destinationType, volume } = req.query;
@@ -180,43 +189,13 @@ router.get('/ai-suggestions', async (req, res) => {
           message: `Approfitta della promozione "${activePromotions[0].name}" di ${carrier.name} con uno sconto del ${activePromotions[0].discountPercentage}%, valida fino al ${activePromotions[0].endDate.toLocaleDateString()}`
         });
       }
-      
-      // Analisi del margine e suggerimenti per migliorarlo
-      carrier.services.forEach(service => {
-        if (!service.destinationTypes.includes(destinationType)) return;
-        
-        const priceDetails = carrier.calculateFinalPrice(
-          service.code,
-          parseFloat(weight),
-          destinationType,
-          null,
-          parseInt(volume)
-        );
-        
-        if (priceDetails && priceDetails.actualMargin < 15) {
-          suggestions.push({
-            type: 'margin_warning',
-            carrierId: carrier._id,
-            carrierName: carrier.name,
-            serviceName: service.name,
-            currentMargin: priceDetails.actualMargin,
-            message: `Attenzione: il margine per ${service.name} di ${carrier.name} è solo del ${priceDetails.actualMargin.toFixed(2)}%. Considera di aumentare il prezzo o negoziare migliori tariffe d'acquisto.`
-          });
-        }
-      });
     });
     
-    // Ordina i suggerimenti per rilevanza
+    // Ordina i suggerimenti per rilevanza (maggiore sconto in cima)
     suggestions.sort((a, b) => {
-      // Priorità ai warning sui margini
-      if (a.type === 'margin_warning' && b.type !== 'margin_warning') return -1;
-      if (a.type !== 'margin_warning' && b.type === 'margin_warning') return 1;
-      
-      // Poi promozioni attive
       if (a.type === 'active_promotion' && b.type === 'volume_increase') return -1;
       if (a.type === 'volume_increase' && b.type === 'active_promotion') return 1;
       
-      // Ordina per percentuale di sconto
       if (a.type === 'active_promotion' && b.type === 'active_promotion') {
         return b.discountPercentage - a.discountPercentage;
       }
@@ -234,4 +213,132 @@ router.get('/ai-suggestions', async (req, res) => {
   }
 });
 
-module.exports = router; 
+// Carica i dati dei corrieri da un file CSV
+router.post('/carriers/upload-csv', upload.single('csvFile'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'Nessun file caricato' });
+    }
+
+    const { carrierId } = req.body;
+    if (!carrierId) {
+      return res.status(400).json({ message: 'ID del corriere richiesto' });
+    }
+
+    // Trova il corriere esistente
+    const carrier = await Carrier.findById(carrierId);
+    if (!carrier) {
+      return res.status(404).json({ message: 'Corriere non trovato' });
+    }
+
+    const results = [];
+    const errors = [];
+
+    // Leggi il file CSV
+    fs.createReadStream(req.file.path)
+      .pipe(csv())
+      .on('data', (data) => {
+        results.push(data);
+      })
+      .on('end', async () => {
+        // Elabora i dati CSV
+        for (const row of results) {
+          try {
+            const serviceName = row.serviceName;
+            const serviceCode = row.serviceCode || serviceName.toLowerCase().replace(/\s+/g, '_');
+            const destinationType = row.destinationType || 'national';
+            const countryCode = row.countryCode || null;
+            const minWeight = parseFloat(row.minWeight) || 0;
+            const maxWeight = parseFloat(row.maxWeight) || 100;
+            const retailPrice = parseFloat(row.retailPrice) || 0;
+            const purchasePrice = parseFloat(row.purchasePrice) || 0;
+            const margin = row.margin ? parseFloat(row.margin) : (retailPrice - purchasePrice);
+            const deliveryTimeMin = row.deliveryTimeMin ? parseInt(row.deliveryTimeMin) : null;
+            const deliveryTimeMax = row.deliveryTimeMax ? parseInt(row.deliveryTimeMax) : null;
+            
+            // Verifica se il servizio esiste già
+            let service = carrier.services.find(s => s.code === serviceCode);
+            
+            if (!service) {
+              // Crea un nuovo servizio
+              service = {
+                name: serviceName,
+                code: serviceCode,
+                description: row.description || '',
+                deliveryTimeMin,
+                deliveryTimeMax,
+                destinationTypes: [destinationType],
+                pricing: []
+              };
+              carrier.services.push(service);
+            } else if (!service.destinationTypes.includes(destinationType)) {
+              service.destinationTypes.push(destinationType);
+            }
+            
+            // Trova il pricing per la destinazione
+            let pricing = service.pricing.find(p => 
+              p.destinationType === destinationType && 
+              (p.countryCode === countryCode || (countryCode === null && p.countryCode === null))
+            );
+            
+            if (!pricing) {
+              pricing = {
+                destinationType,
+                countryCode,
+                weightRanges: []
+              };
+              service.pricing.push(pricing);
+            }
+            
+            // Aggiungi o aggiorna il range di peso
+            const existingWeightRange = pricing.weightRanges.find(wr => 
+              wr.min === minWeight && wr.max === maxWeight
+            );
+            
+            if (existingWeightRange) {
+              existingWeightRange.retailPrice = retailPrice;
+              existingWeightRange.purchasePrice = purchasePrice;
+              existingWeightRange.margin = margin;
+            } else {
+              pricing.weightRanges.push({
+                min: minWeight,
+                max: maxWeight,
+                retailPrice,
+                purchasePrice,
+                margin
+              });
+            }
+          } catch (error) {
+            errors.push({ row, error: error.message });
+          }
+        }
+        
+        // Salva le modifiche
+        await carrier.save();
+        
+        // Elimina il file temporaneo
+        fs.unlinkSync(req.file.path);
+        
+        res.json({ 
+          message: 'Dati del corriere aggiornati con successo', 
+          rowsProcessed: results.length,
+          errors: errors.length > 0 ? errors : null
+        });
+      });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Crea un nuovo corriere
+router.post('/carriers', async (req, res) => {
+  try {
+    const carrier = new Carrier(req.body);
+    const savedCarrier = await carrier.save();
+    res.status(201).json(savedCarrier);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+module.exports = router;

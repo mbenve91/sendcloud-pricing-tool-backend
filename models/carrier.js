@@ -1,16 +1,10 @@
 const mongoose = require('mongoose');
 
-/**
- * Schema MongoDB per i corrieri e le loro tariffe di spedizione
- * Questo modello memorizza informazioni sui corrieri, i loro servizi e le tariffe
- * basate su intervalli di peso e destinazioni.
- */
 const carrierSchema = new mongoose.Schema({
   name: {
     type: String,
     required: true,
-    unique: true,
-    trim: true
+    unique: true
   },
   logoUrl: {
     type: String,
@@ -18,34 +12,29 @@ const carrierSchema = new mongoose.Schema({
   },
   isVolumetric: {
     type: Boolean,
-    required: true,
-    default: false
+    required: true
   },
   fuelSurcharge: {
     type: Number,
-    default: 0,
-    min: 0
+    default: 0
   },
   services: [{
     name: {
       type: String,
-      required: true,
-      trim: true
+      required: true
     },
     code: {
       type: String,
-      required: true,
-      trim: true
+      required: true
     },
     description: {
-      type: String,
-      trim: true
+      type: String
     },
     deliveryTimeMin: {
-      type: Number  // in ore
+      type: Number  // in hours
     },
     deliveryTimeMax: {
-      type: Number  // in ore
+      type: Number  // in hours
     },
     destinationTypes: [{
       type: String,
@@ -60,33 +49,28 @@ const carrierSchema = new mongoose.Schema({
       },
       countryCode: {
         type: String,
-        default: null  // applicabile per paesi specifici
+        default: null  // applicable for specific countries
       },
       weightRanges: [{
         min: {
           type: Number,
-          required: true,
-          min: 0
+          required: true
         },
         max: {
           type: Number,
-          required: true,
-          min: 0
+          required: true
         },
         retailPrice: {
           type: Number,
-          required: true,
-          min: 0
+          required: true
         },
         purchasePrice: {
           type: Number,
-          required: true,
-          min: 0
+          required: true
         },
         margin: {
           type: Number,
-          required: true,
-          min: 0
+          required: true
         }
       }]
     }]
@@ -94,57 +78,46 @@ const carrierSchema = new mongoose.Schema({
   volumeDiscounts: [{
     minVolume: {
       type: Number,
-      required: true,
-      min: 1
+      required: true
     },
     maxVolume: {
-      type: Number,
-      min: 1
+      type: Number
     },
     discountPercentage: {
       type: Number,
-      required: true,
-      min: 0,
-      max: 100
+      required: true
     },
     applicableServices: [{
-      type: String  // codice servizio
+      type: String  // service code
     }]
   }],
   additionalFees: [{
     name: {
       type: String,
-      required: true,
-      trim: true
+      required: true
     },
     description: {
-      type: String,
-      trim: true
+      type: String
     },
     fee: {
       type: Number,
-      required: true,
-      min: 0
+      required: true
     },
     applicableServices: [{
-      type: String  // codice servizio
+      type: String  // service code
     }]
   }],
   promotions: [{
     name: {
       type: String,
-      required: true,
-      trim: true
+      required: true
     },
     description: {
-      type: String,
-      trim: true
+      type: String
     },
     discountPercentage: {
       type: Number,
-      required: true,
-      min: 0,
-      max: 100
+      required: true
     },
     startDate: {
       type: Date,
@@ -155,7 +128,7 @@ const carrierSchema = new mongoose.Schema({
       required: true
     },
     applicableServices: [{
-      type: String  // codice servizio
+      type: String  // service code
     }]
   }],
   isActive: {
@@ -166,25 +139,31 @@ const carrierSchema = new mongoose.Schema({
   timestamps: true
 });
 
-/**
- * Metodo per calcolare il prezzo finale includendo sconti per volume e promozioni
- * @param {String} serviceCode - Codice del servizio
- * @param {Number} weight - Peso della spedizione in kg
- * @param {String} destinationType - Tipo di destinazione (national, eu, extra_eu)
- * @param {String} countryCode - Codice paese (opzionale)
- * @param {Number} volume - Volume mensile di spedizioni (opzionale)
- * @returns {Object} Dettagli del prezzo calcolato o null se non applicabile
- */
+// Metodo per calcolare il prezzo finale includendo sconti per volume e promozioni
 carrierSchema.methods.calculateFinalPrice = function(serviceCode, weight, destinationType, countryCode, volume) {
   // Trova il servizio appropriato
   const service = this.services.find(s => s.code === serviceCode);
   if (!service) return null;
   
-  // Trova il pricing per la destinazione richiesta
-  const pricing = service.pricing.find(p => 
-    p.destinationType === destinationType && 
-    (!countryCode || !p.countryCode || p.countryCode === countryCode)
-  );
+  // Prima cerca un pricing specifico per il paese
+  let pricing = null;
+  
+  if (countryCode) {
+    // Cerca prima un pricing specifico per il paese
+    pricing = service.pricing.find(p => 
+      p.destinationType === destinationType && 
+      p.countryCode === countryCode
+    );
+  }
+  
+  // Se non trova un pricing specifico per il paese, cerca un pricing generale per il tipo di destinazione
+  if (!pricing) {
+    pricing = service.pricing.find(p => 
+      p.destinationType === destinationType && 
+      p.countryCode === null
+    );
+  }
+  
   if (!pricing) return null;
   
   // Trova il range di peso appropriato
@@ -244,4 +223,4 @@ carrierSchema.methods.calculateFinalPrice = function(serviceCode, weight, destin
   };
 };
 
-module.exports = mongoose.model('Carrier', carrierSchema); 
+module.exports = mongoose.model('Carrier', carrierSchema);
