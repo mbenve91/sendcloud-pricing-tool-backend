@@ -1,111 +1,142 @@
-# SendQuote - Strumento di Confronto Tariffe per SendCloud
+# Backend per Sendcloud Pricing Tool
 
-SendQuote è un'applicazione full-stack che aiuta i venditori di SendCloud a confrontare e presentare le tariffe di spedizione di diversi corrieri ai potenziali clienti. L'applicazione semplifica il processo di determinazione delle tariffe appropriate e degli sconti, fornendo anche suggerimenti basati sull'intelligenza artificiale.
+Questo repository contiene il backend per l'applicazione Sendcloud Pricing Tool. È costruito utilizzando Express.js e MongoDB.
 
-## Funzionalità Principali
+## Prerequisiti
 
-- Confronto delle tariffe di spedizione di diversi corrieri
-- Filtri per corriere, tipo di servizio, peso, destinazione e volume
-- Visualizzazione di sconti e margini di profitto con indicatori visivi
-- Suggerimenti AI per l'ottimizzazione delle tariffe
-- Interfaccia utente intuitiva e reattiva
+- Node.js (v14+)
+- MongoDB (Cloud Atlas)
 
-## Tecnologie Utilizzate
+## Installazione
 
-### Backend
-- Node.js/Express
-- MongoDB
-- RESTful API
+1. Clona il repository
+2. Installa le dipendenze
 
-### Frontend
-- React
-- Material-UI
-- Axios
-
-## Struttura del Progetto
-
-```
-sendcloud-tool/
-├── models/
-│   └── carrier.js
-├── routes/
-│   └── carrier.routes.js
-├── scripts/
-│   └── seedDatabase.js
-├── public/
-│   └── images/
-│       └── carriers/
-├── client/
-│   └── src/
-│       └── components/
-│           └── RateComparisonCard.jsx
-├── app.js
-├── .env
-└── package.json
-```
-
-## Installazione e Avvio
-
-### Prerequisiti
-- Node.js (v14 o superiore)
-- MongoDB
-
-### Installazione
-
-1. Clona il repository:
-```
-git clone https://github.com/tuousername/sendcloud-tool.git
-cd sendcloud-tool
-```
-
-2. Installa le dipendenze del backend:
-```
+```bash
 npm install
 ```
 
-3. Installa le dipendenze del frontend:
-```
-cd client
-npm install
-cd ..
-```
+3. Crea un file `.env` nella root del progetto con le seguenti variabili:
 
-4. Configura le variabili d'ambiente:
-Crea un file `.env` nella directory principale con il seguente contenuto:
 ```
+MONGODB_URI=<il-tuo-uri-mongodb>
 PORT=5000
-MONGODB_URI=mongodb://localhost:27017/sendcloud-tool
-CORS_ORIGIN=http://localhost:3000
 NODE_ENV=development
 ```
 
-5. Popola il database con dati di esempio:
-```
-npm run seed
-```
+## Avvio dell'applicazione
 
-### Avvio dell'applicazione
+Per avviare l'applicazione in modalità sviluppo:
 
-1. Avvia il server backend:
-```
+```bash
 npm run dev
 ```
 
-2. In un altro terminale, avvia il client React:
-```
-cd client
+Per avviare l'applicazione in produzione:
+
+```bash
 npm start
 ```
 
-3. Apri il browser e vai a `http://localhost:3000`
+## Struttura dell'API
 
-## API Endpoints
+Il backend espone le seguenti API:
 
-- `GET /api/carriers` - Elenco di tutti i corrieri
-- `GET /api/carriers/:id` - Dettagli di un corriere specifico
-- `GET /api/compare-rates` - Confronto delle tariffe con opzioni di filtro
-- `GET /api/ai-suggestions` - Suggerimenti AI per ottimizzare le tariffe
+### Carriers
 
-## Licenza
+- `GET /api/carriers` - Ottieni tutti i carrier
+- `GET /api/carriers/:id` - Ottieni un carrier specifico
+- `POST /api/carriers` - Crea un nuovo carrier
+- `PUT /api/carriers/:id` - Aggiorna un carrier esistente
+- `DELETE /api/carriers/:id` - Elimina un carrier
+- `GET /api/carriers/:id/services` - Ottieni tutti i servizi di un carrier
 
-ISC 
+### Rates
+
+- `GET /api/rates` - Ottieni tutte le tariffe (supporta filtri)
+  - Parametri di query:
+    - `carrierId` - Filtra per carrier
+    - `destinationType` - Filtra per tipo di destinazione (national, eu, extra_eu)
+    - `weight` - Trova tariffe per un peso specifico
+    - `serviceCode` - Filtra per codice servizio
+    - `destinationCountry` - Filtra per paese di destinazione
+    - `includeInactive` - Includi anche tariffe inattive
+- `GET /api/rates/:id` - Ottieni una tariffa specifica
+- `POST /api/rates` - Crea una nuova tariffa
+- `PUT /api/rates/:id` - Aggiorna una tariffa esistente
+- `PATCH /api/rates/:id/margin-discount` - Aggiorna lo sconto sul margine di una tariffa
+- `DELETE /api/rates/:id` - Elimina una tariffa
+
+### Suggestions
+
+- `GET /api/suggestions` - Ottieni tutti i suggerimenti attivi
+- `GET /api/suggestions/:id` - Ottieni un suggerimento specifico
+- `POST /api/suggestions` - Crea un nuovo suggerimento
+- `PATCH /api/suggestions/:id/apply` - Marca un suggerimento come applicato
+- `PATCH /api/suggestions/:id/dismiss` - Marca un suggerimento come respinto
+- `DELETE /api/suggestions/:id` - Elimina un suggerimento
+
+## Modelli di dati
+
+### Carrier
+
+```javascript
+{
+  name: String,
+  logoUrl: String,
+  isVolumetric: Boolean,
+  fuelSurcharge: Number,
+  services: [{
+    name: String,
+    code: String,
+    description: String,
+    deliveryTimeMin: Number,
+    deliveryTimeMax: Number,
+    destinationTypes: [String],
+    pricing: [{
+      destinationType: String,
+      countryCode: String,
+      // altri dettagli di prezzo
+    }]
+  }]
+}
+```
+
+### Rate
+
+```javascript
+{
+  carrierId: ObjectId,
+  serviceCode: String,
+  serviceName: String,
+  basePrice: Number,
+  fuelSurcharge: Number,
+  volumeDiscount: Number,
+  promotionDiscount: Number,
+  purchasePrice: Number,
+  sellingPrice: Number,
+  marginDiscount: Number,
+  weight: Number,
+  destinationType: String,
+  destinationCountry: String,
+  deliveryTimeMin: Number,
+  deliveryTimeMax: Number,
+  active: Boolean
+}
+```
+
+### Suggestion
+
+```javascript
+{
+  type: String,
+  carrierId: ObjectId,
+  message: String,
+  details: Object,
+  priority: Number,
+  applied: Boolean,
+  dismissed: Boolean,
+  createdAt: Date,
+  validUntil: Date
+}
+``` 
