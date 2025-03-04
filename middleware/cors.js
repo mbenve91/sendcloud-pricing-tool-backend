@@ -11,7 +11,8 @@ const corsOptions = {
     const allowedOrigins = [
       'http://localhost:3000',
       'http://localhost:5050',
-      'https://sendcloud-pricing-tool.vercel.app'
+      'https://sendcloud-pricing-tool.vercel.app',
+      'https://sendcloud-pricing-tool-frontend-lnc43o6up.vercel.app'
     ];
     
     if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
