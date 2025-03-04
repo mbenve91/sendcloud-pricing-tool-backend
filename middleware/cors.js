@@ -7,19 +7,30 @@ const corsOptions = {
     // Consenti richieste senza origine (come app mobile o curl)
     if (!origin) return callback(null, true);
     
-    // Lista delle origini consentite
+    // Lista delle origini consentite statiche
     const allowedOrigins = [
       'http://localhost:3000',
       'http://localhost:5050',
-      'https://sendcloud-pricing-tool.vercel.app',
-      'https://sendcloud-pricing-tool-frontend-lnc43o6up.vercel.app'
+      'https://sendcloud-pricing-tool.vercel.app'
     ];
     
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
-      callback(null, true);
-    } else {
-      callback(new Error('Non consentito dal CORS'));
+    // Verifica se l'origine è nella lista statica
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
     }
+    
+    // Verifica se l'origine è un dominio Vercel
+    if (origin.match(/^https:\/\/[a-z0-9-]+\.vercel\.app$/i)) {
+      return callback(null, true);
+    }
+    
+    // In sviluppo, accetta tutte le origini
+    if (process.env.NODE_ENV === 'development') {
+      return callback(null, true);
+    }
+    
+    // Altrimenti, blocca la richiesta
+    callback(new Error('Non consentito dal CORS'));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
