@@ -56,6 +56,13 @@ app.get('/templates/carriers', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/templates/template-carriers.csv'));
 });
 
+// Route per scaricare le istruzioni del template
+app.get('/templates/carriers/instructions', (req, res) => {
+  res.setHeader('Content-Type', 'text/plain');
+  res.setHeader('Content-Disposition', 'attachment; filename=istruzioni-template.txt');
+  res.sendFile(path.join(__dirname, 'public/templates/README-template.txt'));
+});
+
 // Gestione delle route non trovate
 app.use((req, res, next) => {
   res.status(404).json({

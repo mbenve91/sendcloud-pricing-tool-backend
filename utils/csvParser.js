@@ -32,35 +32,42 @@ const validateCarriersData = (carriers) => {
   const errors = [];
 
   carriers.forEach((row, index) => {
+    // Gestisci i nomi delle colonne vecchie e nuove
+    const carrierName = row.carrier_name || row.name;
+    const logoUrl = row.logo_url || row.logoUrl;
+    const isVolumetric = row.is_volumetric || row.isVolumetric;
+    const fuelSurcharge = row.fuel_surcharge || row.fuelSurcharge;
+    const isActive = row.is_active || row.isActive;
+    
     // Validazione dei campi obbligatori di base
-    if (!row.name) {
+    if (!carrierName) {
       errors.push(`Riga ${index + 2}: Nome del carrier mancante`);
       return;
     }
     
     // Trasforma i campi booleani
-    const isVolumetric = row.isVolumetric && 
-      (row.isVolumetric.toLowerCase() === 'true' || row.isVolumetric === '1');
+    const isVolumetricBool = isVolumetric && 
+      (isVolumetric.toLowerCase() === 'true' || isVolumetric === '1');
     
-    const isActive = row.isActive === undefined ? true : 
-      (row.isActive.toLowerCase() === 'true' || row.isActive === '1');
+    const isActiveBool = isActive === undefined ? true : 
+      (isActive.toLowerCase() === 'true' || isActive === '1');
     
     // Converte fuelSurcharge in numero
-    const fuelSurcharge = row.fuelSurcharge ? parseFloat(row.fuelSurcharge) : 0;
+    const fuelSurchargeNum = fuelSurcharge ? parseFloat(fuelSurcharge) : 0;
     
-    if (isNaN(fuelSurcharge)) {
-      errors.push(`Riga ${index + 2}: Valore fuelSurcharge non valido per ${row.name}`);
+    if (isNaN(fuelSurchargeNum)) {
+      errors.push(`Riga ${index + 2}: Valore fuelSurcharge non valido per ${carrierName}`);
       return;
     }
 
     // Ottieni o crea il carrier
-    if (!validCarriers[row.name]) {
-      validCarriers[row.name] = {
-        name: row.name.trim(),
-        logoUrl: row.logoUrl ? row.logoUrl.trim() : '/images/carriers/default.png',
-        isVolumetric,
-        fuelSurcharge,
-        isActive,
+    if (!validCarriers[carrierName]) {
+      validCarriers[carrierName] = {
+        name: carrierName.trim(),
+        logoUrl: logoUrl ? logoUrl.trim() : '/images/carriers/default.png',
+        isVolumetric: isVolumetricBool,
+        fuelSurcharge: fuelSurchargeNum,
+        isActive: isActiveBool,
         services: [],
         volumeDiscounts: [],
         additionalFees: [],
@@ -71,7 +78,7 @@ const validateCarriersData = (carriers) => {
     // Se abbiamo informazioni sul servizio, aggiungiamole
     if (row.service_name) {
       // Trova o crea il servizio
-      let service = validCarriers[row.name].services.find(s => s.name === row.service_name);
+      let service = validCarriers[carrierName].services.find(s => s.name === row.service_name);
       
       if (!service) {
         service = {
@@ -83,7 +90,7 @@ const validateCarriersData = (carriers) => {
           destinationTypes: [],
           pricing: []
         };
-        validCarriers[row.name].services.push(service);
+        validCarriers[carrierName].services.push(service);
       }
 
       // Aggiungi il tipo di destinazione se non esiste già
