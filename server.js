@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const dotenv = require('dotenv');
+const path = require('path');
 
 // Carica le variabili d'ambiente
 dotenv.config();
@@ -25,6 +26,9 @@ app.use(helmet());
 app.use(morgan('dev'));
 app.use(express.json());
 
+// Servi file statici
+app.use('/public', express.static(path.join(__dirname, 'public')));
+
 // Connessione a MongoDB
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => {
@@ -43,6 +47,13 @@ app.use('/api/suggestions', suggestionRoutes);
 // Route di base
 app.get('/', (req, res) => {
   res.send('API di Sendcloud Pricing Tool');
+});
+
+// Route per scaricare il template CSV
+app.get('/templates/carriers', (req, res) => {
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename=template-carriers.csv');
+  res.sendFile(path.join(__dirname, 'public/templates/template-carriers.csv'));
 });
 
 // Gestione delle route non trovate

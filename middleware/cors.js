@@ -10,6 +10,7 @@ const corsOptions = {
     // Lista delle origini consentite
     const allowedOrigins = [
       'http://localhost:3000',
+      'http://localhost:5050',
       'https://sendcloud-pricing-tool.vercel.app'
     ];
     

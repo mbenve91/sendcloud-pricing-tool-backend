@@ -1,0 +1,5 @@
+name,logoUrl,isVolumetric,fuelSurcharge,isActive
+BRT,/images/carriers/brt.png,true,8.5,true
+DHL,/images/carriers/dhl.png,true,9.2,true
+UPS,/images/carriers/ups.png,true,7.8,true
+TNT,/images/carriers/tnt.png,false,6.5,true 

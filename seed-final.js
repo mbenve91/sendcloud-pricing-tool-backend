@@ -1,28 +1,159 @@
-// Script per popolare il database con dati di test
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
-const Carrier = require('../models/carrier');
-const Rate = require('../models/rate');
-const Suggestion = require('../models/suggestion');
 
 // Carica le variabili d'ambiente
 dotenv.config();
 
-// Connessione a MongoDB
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => {
-    console.log('Connesso a MongoDB per il seeding');
-    seedData();
-  })
-  .catch(err => {
-    console.error('Errore di connessione a MongoDB:', err.message);
-    process.exit(1);
-  });
+// Definizione dello schema Carrier direttamente in questo file
+const carrierSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+    unique: true
+  },
+  logoUrl: {
+    type: String,
+    default: '/images/carriers/default.png'
+  },
+  isVolumetric: {
+    type: Boolean,
+    required: true
+  },
+  fuelSurcharge: {
+    type: Number,
+    default: 0
+  },
+  services: [{
+    name: {
+      type: String,
+      required: true
+    },
+    code: {
+      type: String,
+      required: true
+    },
+    description: {
+      type: String
+    },
+    deliveryTimeMin: {
+      type: Number  // in hours
+    },
+    deliveryTimeMax: {
+      type: Number  // in hours
+    },
+    destinationTypes: [{
+      type: String,
+      enum: ['national', 'eu', 'extra_eu'],
+      required: true
+    }]
+  }]
+});
 
-// Dati di esempio semplificati per i carrier
+// Definizione dello schema Rate direttamente in questo file
+const rateSchema = new mongoose.Schema({
+  carrierId: {
+    type: mongoose.Schema.Types.ObjectId,
+    required: true
+  },
+  serviceCode: {
+    type: String,
+    required: true
+  },
+  serviceName: {
+    type: String,
+    required: true
+  },
+  basePrice: {
+    type: Number,
+    required: true
+  },
+  fuelSurcharge: {
+    type: Number,
+    default: 0
+  },
+  volumeDiscount: {
+    type: Number,
+    default: 0
+  },
+  promotionDiscount: {
+    type: Number,
+    default: 0
+  },
+  purchasePrice: {
+    type: Number,
+    required: true
+  },
+  sellingPrice: {
+    type: Number,
+    required: true
+  },
+  marginDiscount: {
+    type: Number,
+    default: 0
+  },
+  weight: {
+    type: Number,
+    required: true
+  },
+  destinationType: {
+    type: String,
+    enum: ['national', 'eu', 'extra_eu'],
+    required: true
+  },
+  deliveryTimeMin: {
+    type: Number
+  },
+  deliveryTimeMax: {
+    type: Number
+  },
+  active: {
+    type: Boolean,
+    default: true
+  }
+});
+
+// Definizione dello schema Suggestion direttamente in questo file
+const suggestionSchema = new mongoose.Schema({
+  type: {
+    type: String,
+    enum: ['price_optimization', 'cross_sell', 'upsell', 'retention', 'custom'],
+    required: true
+  },
+  carrierId: {
+    type: mongoose.Schema.Types.ObjectId
+  },
+  message: {
+    type: String,
+    required: true
+  },
+  details: {
+    type: Object
+  },
+  priority: {
+    type: Number,
+    default: 1,
+    min: 1,
+    max: 3
+  },
+  applied: {
+    type: Boolean,
+    default: false
+  },
+  dismissed: {
+    type: Boolean,
+    default: false
+  }
+});
+
+// Creazione dei modelli
+const Carrier = mongoose.model('Carrier', carrierSchema);
+const Rate = mongoose.model('Rate', rateSchema);
+const Suggestion = mongoose.model('Suggestion', suggestionSchema);
+
+// Dati di esempio per i carrier
 const carriersData = [
   {
-    name: 'BRT-Sendcloud',
+    name: 'BRT-Final',
     logoUrl: '/images/carriers/brt.png',
     isVolumetric: true,
     fuelSurcharge: 8.5,
@@ -46,7 +177,7 @@ const carriersData = [
     ]
   },
   {
-    name: 'DHL-Sendcloud',
+    name: 'DHL-Final',
     logoUrl: '/images/carriers/dhl.png',
     isVolumetric: true,
     fuelSurcharge: 9.2,
@@ -58,45 +189,13 @@ const carriersData = [
         deliveryTimeMin: 24,
         deliveryTimeMax: 36,
         destinationTypes: ['national', 'eu', 'extra_eu']
-      },
-      {
-        name: 'DHL Economy',
-        code: 'DHL_ECONOMY',
-        description: 'Consegna economica in 48-72h',
-        deliveryTimeMin: 48,
-        deliveryTimeMax: 72,
-        destinationTypes: ['national', 'eu', 'extra_eu']
-      }
-    ]
-  },
-  {
-    name: 'GLS-Sendcloud',
-    logoUrl: '/images/carriers/gls.png',
-    isVolumetric: true,
-    fuelSurcharge: 7.8,
-    services: [
-      {
-        name: 'GLS Express',
-        code: 'GLS_EXPRESS',
-        description: 'Consegna express in 24h',
-        deliveryTimeMin: 24,
-        deliveryTimeMax: 48,
-        destinationTypes: ['national', 'eu']
-      },
-      {
-        name: 'GLS Standard',
-        code: 'GLS_STANDARD',
-        description: 'Consegna standard in 48h',
-        deliveryTimeMin: 48,
-        deliveryTimeMax: 72,
-        destinationTypes: ['national', 'eu']
       }
     ]
   }
 ];
 
-// Pesi per le tariffe
-const weights = [0.5, 1, 2, 3, 5, 10, 15, 20, 30];
+// Pesi predefiniti
+const weights = [1, 2, 5, 10];
 
 // Prezzi di base per destinazione e servizio
 const basePrices = {
@@ -168,6 +267,8 @@ function generateRates(carriers) {
 
 // Funzione per generare suggerimenti
 function generateSuggestions(carriers) {
+  if (carriers.length < 2) return [];
+  
   const suggestions = [
     {
       type: 'price_optimization',
@@ -191,62 +292,65 @@ function generateSuggestions(carriers) {
         conversionRate: 70
       },
       priority: 2
-    },
-    {
-      type: 'retention',
-      carrierId: carriers[2]._id,
-      message: "Offrire uno sconto del 10% ai clienti che hanno ridotto l'utilizzo di GLS nell'ultimo trimestre",
-      details: {
-        targetCustomers: 'decreasing_usage',
-        discountPercentage: 10,
-        estimatedRetention: 65
-      },
-      priority: 1
     }
   ];
   
   return suggestions;
 }
 
-// Funzione per popolare il database
+// Funzione principale di seeding
 async function seedData() {
+  let connection;
+  
   try {
+    // Connessione al database
+    connection = await mongoose.connect(process.env.MONGODB_URI);
+    console.log('Connesso a MongoDB');
+    
     // Elimina i dati esistenti
     await Carrier.deleteMany({});
     await Rate.deleteMany({});
     await Suggestion.deleteMany({});
-    
     console.log('Database ripulito');
     
     // Inserisci i carrier
     const createdCarriers = await Carrier.insertMany(carriersData);
     console.log(`Inseriti ${createdCarriers.length} carrier`);
     
-    // Genera e inserisci le tariffe
+    // Genera le tariffe
     const rates = generateRates(createdCarriers);
     
-    // Dividi le tariffe in batch
-    const batchSize = 50;
+    // Inserisci le tariffe in batch
+    const batchSize = 20;
+    let insertedRates = 0;
+    
     for (let i = 0; i < rates.length; i += batchSize) {
       const batch = rates.slice(i, i + batchSize);
       await Rate.insertMany(batch);
-      console.log(`Inserite ${batch.length} tariffe (${i + batch.length}/${rates.length})`);
+      insertedRates += batch.length;
+      console.log(`Inserite ${insertedRates}/${rates.length} tariffe`);
     }
     
     // Genera e inserisci i suggerimenti
     const suggestions = generateSuggestions(createdCarriers);
-    await Suggestion.insertMany(suggestions);
-    console.log(`Inseriti ${suggestions.length} suggerimenti`);
+    if (suggestions.length > 0) {
+      await Suggestion.insertMany(suggestions);
+      console.log(`Inseriti ${suggestions.length} suggerimenti`);
+    } else {
+      console.log('Nessun suggerimento inserito');
+    }
     
     console.log('Seeding completato con successo');
-    
-    // Chiudi la connessione
-    mongoose.connection.close();
   } catch (err) {
     console.error('Errore durante il seeding:', err);
-    mongoose.connection.close();
+  } finally {
+    // Chiudi la connessione nel blocco finally
+    if (connection) {
+      await mongoose.disconnect();
+      console.log('Connessione al database chiusa');
+    }
   }
 }
 
-// Esporta la funzione per poterla utilizzare da command line
-module.exports = seedData; 
+// Esegui il seeding
+seedData(); 

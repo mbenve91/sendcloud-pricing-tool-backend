@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const Carrier = require('../models/carrier');
+const { uploadSingle } = require('../middleware/upload');
+const { parseCSV, validateCarriersData } = require('../utils/csvParser');
+const fs = require('fs-extra');
 
 // GET - Ottieni tutti i carrier
 router.get('/', async (req, res) => {
@@ -90,6 +93,75 @@ router.get('/:id/services', async (req, res) => {
     res.json(carrier.services);
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+});
+
+// POST - Importa carriers da CSV
+router.post('/import', uploadSingle, async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'Nessun file caricato' });
+    }
+
+    // Parsa il file CSV
+    const carriers = await parseCSV(req.file.path);
+    
+    // Valida i dati
+    const { validCarriers, errors } = validateCarriersData(carriers);
+    
+    // Verifica se ci sono errori di validazione
+    if (errors.length > 0 && validCarriers.length === 0) {
+      // Elimina il file caricato
+      await fs.unlink(req.file.path);
+      return res.status(400).json({ message: 'Validazione fallita', errors });
+    }
+    
+    // Salva i carrier validi nel database
+    const results = {
+      success: [],
+      errors: [...errors]
+    };
+    
+    for (const carrier of validCarriers) {
+      try {
+        // Controlla se il carrier già esiste
+        const existingCarrier = await Carrier.findOne({ name: carrier.name });
+        
+        if (existingCarrier) {
+          // Aggiorna il carrier esistente
+          existingCarrier.logoUrl = carrier.logoUrl;
+          existingCarrier.isVolumetric = carrier.isVolumetric;
+          existingCarrier.fuelSurcharge = carrier.fuelSurcharge;
+          existingCarrier.isActive = carrier.isActive;
+          
+          await existingCarrier.save();
+          results.success.push(`Carrier '${carrier.name}' aggiornato con successo`);
+        } else {
+          // Crea un nuovo carrier
+          const newCarrier = new Carrier(carrier);
+          await newCarrier.save();
+          results.success.push(`Carrier '${carrier.name}' creato con successo`);
+        }
+      } catch (error) {
+        results.errors.push(`Errore durante il salvataggio del carrier '${carrier.name}': ${error.message}`);
+      }
+    }
+    
+    // Elimina il file caricato
+    await fs.unlink(req.file.path);
+    
+    // Invia i risultati
+    return res.status(201).json({
+      message: `Importazione completata: ${results.success.length} carrier importati, ${results.errors.length} errori`,
+      results
+    });
+  } catch (error) {
+    // In caso di errore, assicurati di eliminare il file
+    if (req.file) {
+      await fs.unlink(req.file.path).catch(() => {});
+    }
+    
+    return res.status(500).json({ message: `Errore durante l'importazione: ${error.message}` });
   }
 });
 
