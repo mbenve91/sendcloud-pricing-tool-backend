@@ -291,3 +291,53 @@ exports.getRatesByCarrier = asyncHandler(async (req, res) => {
     data: rates
   });
 });
+
+// @desc    Get all weight ranges for a specific service
+// @route   GET /api/rates/service/:serviceId/weightRanges
+// @access  Private
+exports.getWeightRangesByService = asyncHandler(async (req, res) => {
+  const serviceId = req.params.serviceId;
+  
+  if (!serviceId) {
+    res.status(400);
+    throw new Error('Service ID is required');
+  }
+  
+  try {
+    // Verifica che il servizio esista
+    const service = await Service.findById(serviceId);
+    
+    if (!service) {
+      res.status(404);
+      throw new Error('Service not found');
+    }
+    
+    // Trova tutte le tariffe per questo servizio
+    const rates = await Rate.find({ service: serviceId }).sort({ weightMin: 1 });
+    
+    // Trasforma nel formato richiesto
+    const weightRanges = rates.map(rate => ({
+      id: `${rate._id}`,
+      label: `${rate.weightMin}-${rate.weightMax} kg`,
+      min: rate.weightMin,
+      max: rate.weightMax,
+      basePrice: rate.retailPrice,
+      userDiscount: 0,
+      finalPrice: rate.retailPrice,
+      actualMargin: rate.margin || (rate.retailPrice - rate.purchasePrice),
+      volumeDiscount: rate.volumeDiscount || 0,
+      promotionDiscount: rate.promotionDiscount || 0
+    }));
+    
+    res.status(200).json({
+      success: true,
+      count: weightRanges.length,
+      data: weightRanges
+    });
+    
+  } catch (error) {
+    console.error('Errore nel recupero delle fasce di peso:', error);
+    res.status(500);
+    throw new Error('Error retrieving weight ranges');
+  }
+});
