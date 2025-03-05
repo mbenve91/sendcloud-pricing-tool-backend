@@ -18,26 +18,19 @@ const app = express();
 // Middleware
 app.use(express.json());
 
-// Configurazione CORS che accetta qualsiasi origine dal dominio vercel del frontend
-app.use(cors({
-  origin: function(origin, callback) {
-    // Consenti richieste senza origine (come app mobile o Postman)
-    if (!origin) return callback(null, true);
-    
-    // Verifica se l'origine contiene il dominio base di Vercel
-    if (
-      origin.includes('sendcloud-pricing-tool-frontend.vercel.app') || 
-      origin === 'http://localhost:3000'
-    ) {
-      return callback(null, true);
-    }
-    
-    // Log delle origini rifiutate per debug
-    console.log('Origine CORS rifiutata:', origin);
-    callback(null, false);
-  },
-  credentials: true
-}));
+// Configurazione CORS per accettare TUTTE le origini senza alcuna restrizione
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  
+  // Gestisci le richieste OPTIONS per il preflight CORS
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  next();
+});
 
 // Logger
 if (process.env.NODE_ENV === 'development') {
