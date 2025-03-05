@@ -6,12 +6,15 @@
  */
 const mongoose = require('mongoose');
 const { loadModel } = require('../utils/modelLoader');
+require('dotenv').config();  // Carica le variabili d'ambiente
 const Carrier = loadModel('Carrier');
 const Service = loadModel('Service');
 const Rate = loadModel('Rate');
 
 // Connessione a MongoDB
-mongoose.connect('mongodb://localhost:27017/shipping_rates', { 
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/shipping_rates';
+
+mongoose.connect(MONGODB_URI, { 
   useNewUrlParser: true, 
   useUnifiedTopology: true 
 })

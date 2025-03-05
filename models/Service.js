@@ -37,6 +37,10 @@ const ServiceSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  isEU: {
+    type: Boolean,
+    default: false
+  },
   isActive: {
     type: Boolean,
     default: true

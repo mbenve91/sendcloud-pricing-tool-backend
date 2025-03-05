@@ -3,6 +3,13 @@ const { loadModel } = require('../utils/modelLoader');
 const Rate = loadModel('Rate');
 const Carrier = loadModel('Carrier');
 const asyncHandler = require('express-async-handler');
+const Service = require('../models/Service');
+const ErrorResponse = require('../utils/errorResponse');
+
+// Elenco di codici paesi EU
+const EU_COUNTRIES = ['AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 
+                      'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 
+                      'SI', 'ES', 'SE'];
 
 // @desc    Get all rates
 // @route   GET /api/rates
@@ -46,6 +53,7 @@ exports.compareRates = asyncHandler(async (req, res) => {
     destinationCountry = null,
     carrier = null,
     serviceType = null,
+    euType = null,
     minMargin = 0 
   } = req.query;
   
@@ -76,6 +84,14 @@ exports.compareRates = asyncHandler(async (req, res) => {
       });
     
     console.log(`Trovate ${rates.length} tariffe per peso ${weightNum}`);
+    console.log(`Parametri di filtro: destinationType=${destinationType}, euType=${euType}, destinationCountry=${destinationCountry}`);
+    
+    // Stampiamo informazioni sui servizi disponibili
+    rates.forEach(rate => {
+      if (rate.service) {
+        console.log(`Servizio: ${rate.service.name}, Tipo: ${rate.service.destinationType}, Paese: ${rate.service.destinationCountry || 'Non specificato'}`);
+      }
+    });
     
     // Filtra le tariffe in base agli altri criteri
     let filteredRates = rates.filter(rate => {
@@ -83,17 +99,32 @@ exports.compareRates = asyncHandler(async (req, res) => {
       if (!rate.service) return false;
       
       // Filtra per tipo di destinazione se specificato
-      if (destinationType !== 'both') {
-        if (rate.service.destinationType !== destinationType && rate.service.destinationType !== 'both') {
+      if (destinationType && rate.service.destinationType !== destinationType) {
+        return false;
+      }
+      
+      // Se abbiamo un paese specifico, filtra per quel paese
+      if (destinationCountry) {
+        if (rate.service.destinationCountry?.toLowerCase() !== destinationCountry.toLowerCase()) {
           return false;
         }
       }
-      
-      // Filtra per paese di destinazione se specificato
-      if (destinationCountry && 
-          rate.service.destinationCountry && 
-          rate.service.destinationCountry !== destinationCountry) {
-        return false;
+      // Altrimenti, se euType è specificato, filtra in base alla regione EU/Extra EU
+      else if (destinationType === 'international' && euType) {
+        // Determina se il servizio è per EU o Extra EU in base al paese di destinazione
+        const countryCode = rate.service.destinationCountry?.toUpperCase();
+        
+        // Usa il campo isEU salvato nel database
+        const isEUCountry = rate.service.isEU === true;
+        
+        console.log(`Servizio per ${rate.service.name}, paese: ${countryCode}, isEU nel DB: ${isEUCountry}, euType richiesto: ${euType}`);
+        
+        if (euType === 'eu' && !isEUCountry) {
+          return false;
+        }
+        if (euType === 'extra_eu' && isEUCountry) {
+          return false;
+        }
       }
       
       // Filtra per corriere se specificato
