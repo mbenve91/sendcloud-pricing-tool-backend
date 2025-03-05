@@ -17,15 +17,10 @@ const app = express();
 
 // Middleware
 app.use(express.json());
+
+// In produzione, accettiamo tutte le origini per evitare problemi CORS con i vari deploy di Vercel
 app.use(cors({
-  origin: function(origin, callback) {
-    // Accetta richieste da qualsiasi origine Vercel o dalle origini specificate
-    if (!origin || origin.endsWith('.vercel.app') || origin === 'http://localhost:3000') {
-      callback(null, true);
-    } else {
-      callback(new Error('Non permesso da CORS'));
-    }
-  },
+  origin: true, // Accetta tutte le origini
   credentials: true
 }));
 
