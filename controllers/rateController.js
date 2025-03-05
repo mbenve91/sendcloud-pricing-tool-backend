@@ -70,6 +70,8 @@ exports.compareRates = asyncHandler(async (req, res) => {
     minMargin = 0 
   } = req.query;
   
+  console.log(`RICEVUTA RICHIESTA TARIFFE - Parametri: weight=${weight}, destinationType=${destinationType}, euType=${euType}`);
+  
   if (!weight) {
     res.status(400);
     throw new Error('Weight is required for rate comparison');
@@ -102,51 +104,60 @@ exports.compareRates = asyncHandler(async (req, res) => {
     // Stampiamo informazioni sui servizi disponibili
     rates.forEach(rate => {
       if (rate.service) {
-        console.log(`Servizio: ${rate.service.name}, Tipo: ${rate.service.destinationType}, Paese: ${rate.service.destinationCountry || 'Non specificato'}`);
+        console.log(`Servizio: ${rate.service.name}, Tipo: ${rate.service.destinationType}, Paese: ${rate.service.destinationCountry || 'Non specificato'}, isEU: ${rate.service.isEU}`);
       }
     });
     
     // Filtra le tariffe in base agli altri criteri
     let filteredRates = rates.filter(rate => {
       // Verifica che il servizio esista
-      if (!rate.service) return false;
+      if (!rate.service) {
+        console.log(`Rata scartata: servizio mancante`);
+        return false;
+      }
       
       // Filtra per tipo di destinazione se specificato
       if (destinationType && rate.service.destinationType !== destinationType) {
+        console.log(`Rata scartata per ${rate.service.name}: destinationType non corrisponde (richiesto ${destinationType}, trovato ${rate.service.destinationType})`);
         return false;
       }
       
       // Se abbiamo un paese specifico, filtra per quel paese
       if (destinationCountry) {
-        if (rate.service.destinationCountry?.toLowerCase() !== destinationCountry.toLowerCase()) {
+        // Verifica se il paese è incluso nel campo destinationCountry (che può contenere più paesi separati da virgole)
+        const serviceCountries = rate.service.destinationCountry ? rate.service.destinationCountry.split(/,\s*/).map(c => c.toUpperCase()) : [];
+        const matchesCountry = serviceCountries.includes(destinationCountry.toUpperCase());
+        
+        if (!matchesCountry) {
+          console.log(`Rata scartata per ${rate.service.name}: paese non corrisponde (richiesto ${destinationCountry}, trovato ${rate.service.destinationCountry})`);
           return false;
         }
       }
       // Altrimenti, se euType è specificato, filtra in base alla regione EU/Extra EU
       else if (destinationType === 'international' && euType) {
-        // Determina se il servizio è per EU o Extra EU in base al paese di destinazione
-        const countryCode = rate.service.destinationCountry?.toUpperCase();
-        
-        // Usa il campo isEU salvato nel database
         const isEUCountry = rate.service.isEU === true;
         
-        console.log(`Servizio per ${rate.service.name}, paese: ${countryCode}, isEU nel DB: ${isEUCountry}, euType richiesto: ${euType}`);
+        console.log(`Controllo EU per servizio ${rate.service.name}: isEU nel DB=${isEUCountry}, euType richiesto=${euType}`);
         
         if (euType === 'eu' && !isEUCountry) {
+          console.log(`Rata scartata per ${rate.service.name}: non è un servizio EU`);
           return false;
         }
         if (euType === 'extra_eu' && isEUCountry) {
+          console.log(`Rata scartata per ${rate.service.name}: non è un servizio Extra-EU`);
           return false;
         }
       }
       
       // Filtra per corriere se specificato
-      if (carrier && rate.service.carrier._id.toString() !== carrier) {
+      if (carrier && rate.service.carrier && rate.service.carrier._id.toString() !== carrier) {
+        console.log(`Rata scartata per ${rate.service.name}: corriere non corrisponde`);
         return false;
       }
       
       // Filtra per tipo di servizio se specificato
       if (serviceType && rate.service.serviceType !== serviceType) {
+        console.log(`Rata scartata per ${rate.service.name}: tipo servizio non corrisponde`);
         return false;
       }
       
@@ -155,58 +166,36 @@ exports.compareRates = asyncHandler(async (req, res) => {
         ((rate.retailPrice - rate.purchasePrice) / rate.retailPrice) * 100;
       
       if (parseFloat(minMargin) > 0 && marginPercentage < parseFloat(minMargin)) {
+        console.log(`Rata scartata per ${rate.service.name}: margine insufficiente`);
         return false;
       }
       
+      console.log(`Rata accettata per ${rate.service.name}`);
       return true;
     });
     
-    console.log(`Filtrate a ${filteredRates.length} tariffe dopo i criteri`);
+    console.log(`Dopo il filtraggio: ${filteredRates.length} tariffe`);
     
-    // Trasforma i dati per il frontend
-    const formattedRates = filteredRates.map(rate => {
-      const service = rate.service;
-      const carrier = service?.carrier || {};
-      
-      return {
-        _id: rate._id,
-        service: service._id,
-        serviceCode: service.code,
-        serviceName: service.name,
-        description: service.description,
-        weightMin: rate.weightMin,
-        weightMax: rate.weightMax,
-        purchasePrice: rate.purchasePrice,
-        retailPrice: rate.retailPrice,
-        margin: rate.margin,
-        marginPercentage: rate.marginPercentage,
-        destinationType: service.destinationType,
-        destinationCountry: service.destinationCountry,
-        deliveryTimeMin: service.deliveryTimeMin,
-        deliveryTimeMax: service.deliveryTimeMax,
-        carrier: {
-          _id: carrier._id,
-          name: carrier.name,
-          logoUrl: carrier.logoUrl,
-          isVolumetric: carrier.isVolumetric,
-          fuelSurcharge: carrier.fuelSurcharge
-        }
-      };
-    });
-    
-    // Ordina per prezzo retail più basso
-    const sortedRates = formattedRates.sort((a, b) => a.retailPrice - b.retailPrice);
+    if (filteredRates.length === 0 && euType) {
+      // Se non ci sono risultati con il filtro EU/Extra EU ma è stato richiesto, proviamo a verificare il DB
+      const services = await Service.find({ destinationType: 'international' });
+      console.log(`Controllo servizi internazionali presenti nel DB: ${services.length}`);
+      services.forEach(service => {
+        console.log(`Servizio ${service.name}: isEU=${service.isEU}, destinationCountry=${service.destinationCountry}`);
+      });
+    }
     
     res.status(200).json({
       success: true,
-      count: sortedRates.length,
-      data: sortedRates
+      count: filteredRates.length,
+      data: filteredRates
     });
   } catch (error) {
-    console.error('Errore in compareRates:', error);
+    console.error('Errore nella ricerca delle tariffe:', error);
     res.status(500).json({
       success: false,
-      error: 'Errore durante il confronto delle tariffe'
+      message: 'Error comparing rates',
+      error: error.message
     });
   }
 });
