@@ -5,9 +5,10 @@
  * Questo script inserisce direttamente i dati estratti dai CSV senza richiedere i file originali.
  */
 const mongoose = require('mongoose');
-const Carrier = require('../models/Carrier');
-const Service = require('../models/Service');
-const Rate = require('../models/Rate');
+const { loadModel } = require('../utils/modelLoader');
+const Carrier = loadModel('Carrier');
+const Service = loadModel('Service');
+const Rate = loadModel('Rate');
 
 // Connessione a MongoDB
 mongoose.connect('mongodb://localhost:27017/shipping_rates', { 

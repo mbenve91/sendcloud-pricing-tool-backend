@@ -1,7 +1,8 @@
 // routes/services.js - Service routes
 const express = require('express');
 const router = express.Router();
-const Service = require('../models/Service');
+const { loadModel } = require('../utils/modelLoader');
+const Service = loadModel('Service');
 const asyncHandler = require('express-async-handler');
 
 // @desc    Get all services, optionally filtered by carrier

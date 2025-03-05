@@ -1,6 +1,7 @@
 // controllers/rateController.js - Rate operations
-const Rate = require('../models/Rate');
-const Carrier = require('../models/Carrier');
+const { loadModel } = require('../utils/modelLoader');
+const Rate = loadModel('Rate');
+const Carrier = loadModel('Carrier');
 const asyncHandler = require('express-async-handler');
 
 // @desc    Get all rates
