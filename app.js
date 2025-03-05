@@ -8,6 +8,7 @@ const errorMiddleware = require('./middleware/error');
 // Import routes
 const carrierRoutes = require('./routes/carriers');
 const rateRoutes = require('./routes/rates');
+const serviceRoutes = require('./routes/services');
 
 // Connect to database
 connectDB();
@@ -29,6 +30,7 @@ if (process.env.NODE_ENV === 'development') {
 // Mount routes
 app.use('/api/carriers', carrierRoutes);
 app.use('/api/rates', rateRoutes);
+app.use('/api/services', serviceRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
