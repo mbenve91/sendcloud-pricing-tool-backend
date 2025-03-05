@@ -309,25 +309,60 @@ exports.getWeightRangesByService = asyncHandler(async (req, res) => {
       });
     }
     
-    console.log(`Cercando tariffe per il servizio: ${service.name} (codice: ${service.code})`);
+    console.log(`Cercando tariffe per il servizio: ${service.name} (ID: ${service._id})`);
     
-    // Otteniamo tutti i servizi con lo stesso nome/codice
-    const relatedServices = await Service.find({
-      $or: [
-        { name: service.name },
-        { code: service.code }
-      ]
-    });
-    
-    const serviceIds = relatedServices.map(s => s._id);
-    console.log(`Trovati ${serviceIds.length} servizi correlati`);
-    
-    // Ora cerchiamo tutte le rate associate a questi servizi
+    // Modifica qui: cerca direttamente le tariffe per questo servizio
+    // invece di cercare servizi correlati
     const rates = await Rate.find({
-      service: { $in: serviceIds }
+      service: serviceId
     }).sort({ weightMin: 1 });
     
-    console.log(`Trovate ${rates.length} fasce di peso per i servizi correlati`);
+    console.log(`Trovate ${rates.length} fasce di peso per il servizio ${service.name}`);
+    
+    // Se non ci sono tariffe, proviamo a cercare per servizi correlati
+    if (rates.length === 0) {
+      console.log('Nessuna tariffa trovata direttamente. Cerco servizi correlati...');
+      
+      // Otteniamo tutti i servizi con lo stesso nome/codice
+      const relatedServices = await Service.find({
+        $or: [
+          { name: service.name },
+          { code: service.code }
+        ]
+      });
+      
+      const serviceIds = relatedServices.map(s => s._id);
+      console.log(`Trovati ${serviceIds.length} servizi correlati`);
+      
+      // Ora cerchiamo tutte le rate associate a questi servizi
+      const relatedRates = await Rate.find({
+        service: { $in: serviceIds }
+      }).sort({ weightMin: 1 });
+      
+      console.log(`Trovate ${relatedRates.length} fasce di peso per i servizi correlati`);
+      
+      if (relatedRates.length > 0) {
+        // Trasformiamo nel formato richiesto dal frontend
+        const weightRanges = relatedRates.map(rate => ({
+          id: `${rate._id}`,
+          label: `${rate.weightMin}-${rate.weightMax} kg`,
+          min: rate.weightMin,
+          max: rate.weightMax,
+          basePrice: rate.retailPrice,
+          userDiscount: 0,
+          finalPrice: rate.retailPrice,
+          actualMargin: rate.margin || (rate.retailPrice - rate.purchasePrice),
+          volumeDiscount: rate.volumeDiscount || 0,
+          promotionDiscount: rate.promotionDiscount || 0
+        }));
+        
+        return res.status(200).json({
+          success: true,
+          count: weightRanges.length,
+          data: weightRanges
+        });
+      }
+    }
     
     // Trasformiamo nel formato richiesto dal frontend
     const weightRanges = rates.map(rate => ({
