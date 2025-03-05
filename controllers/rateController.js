@@ -44,6 +44,8 @@ exports.compareRates = asyncHandler(async (req, res) => {
     weight, 
     destinationType = 'national', 
     destinationCountry = null,
+    carrier = null,
+    serviceType = null,
     minMargin = 0 
   } = req.query;
   
@@ -55,37 +57,114 @@ exports.compareRates = asyncHandler(async (req, res) => {
   // Parse weight to number
   const weightNum = parseFloat(weight);
   
-  // Build query to find applicable rates
+  // Build base query per peso
   const query = {
     weightMin: { $lte: weightNum },
     weightMax: { $gte: weightNum },
-    destinationType: destinationType === 'both' ? { $in: ['national', 'international', 'both'] } : { $in: [destinationType, 'both'] }
+    isActive: true
   };
   
-  // Add destination country if provided
-  if (destinationCountry) {
-    query.destinationCountry = destinationCountry;
+  try {
+    // Ottieni tutte le tariffe che corrispondono al peso
+    const rates = await Rate.find(query)
+      .populate({
+        path: 'service',
+        populate: {
+          path: 'carrier',
+          select: 'name logoUrl isVolumetric fuelSurcharge'
+        }
+      });
+    
+    console.log(`Trovate ${rates.length} tariffe per peso ${weightNum}`);
+    
+    // Filtra le tariffe in base agli altri criteri
+    let filteredRates = rates.filter(rate => {
+      // Verifica che il servizio esista
+      if (!rate.service) return false;
+      
+      // Filtra per tipo di destinazione se specificato
+      if (destinationType !== 'both') {
+        if (rate.service.destinationType !== destinationType && rate.service.destinationType !== 'both') {
+          return false;
+        }
+      }
+      
+      // Filtra per paese di destinazione se specificato
+      if (destinationCountry && 
+          rate.service.destinationCountry && 
+          rate.service.destinationCountry !== destinationCountry) {
+        return false;
+      }
+      
+      // Filtra per corriere se specificato
+      if (carrier && rate.service.carrier._id.toString() !== carrier) {
+        return false;
+      }
+      
+      // Filtra per tipo di servizio se specificato
+      if (serviceType && rate.service.serviceType !== serviceType) {
+        return false;
+      }
+      
+      // Verifica margine minimo se specificato
+      const marginPercentage = rate.marginPercentage || 
+        ((rate.retailPrice - rate.purchasePrice) / rate.retailPrice) * 100;
+      
+      if (parseFloat(minMargin) > 0 && marginPercentage < parseFloat(minMargin)) {
+        return false;
+      }
+      
+      return true;
+    });
+    
+    console.log(`Filtrate a ${filteredRates.length} tariffe dopo i criteri`);
+    
+    // Trasforma i dati per il frontend
+    const formattedRates = filteredRates.map(rate => {
+      const service = rate.service;
+      const carrier = service?.carrier || {};
+      
+      return {
+        _id: rate._id,
+        service: service._id,
+        serviceCode: service.code,
+        serviceName: service.name,
+        description: service.description,
+        weightMin: rate.weightMin,
+        weightMax: rate.weightMax,
+        purchasePrice: rate.purchasePrice,
+        retailPrice: rate.retailPrice,
+        margin: rate.margin,
+        marginPercentage: rate.marginPercentage,
+        destinationType: service.destinationType,
+        destinationCountry: service.destinationCountry,
+        deliveryTimeMin: service.deliveryTimeMin,
+        deliveryTimeMax: service.deliveryTimeMax,
+        carrier: {
+          _id: carrier._id,
+          name: carrier.name,
+          logoUrl: carrier.logoUrl,
+          isVolumetric: carrier.isVolumetric,
+          fuelSurcharge: carrier.fuelSurcharge
+        }
+      };
+    });
+    
+    // Ordina per prezzo retail più basso
+    const sortedRates = formattedRates.sort((a, b) => a.retailPrice - b.retailPrice);
+    
+    res.status(200).json({
+      success: true,
+      count: sortedRates.length,
+      data: sortedRates
+    });
+  } catch (error) {
+    console.error('Errore in compareRates:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Errore durante il confronto delle tariffe'
+    });
   }
-  
-  // Find all applicable rates
-  const rates = await Rate.find(query)
-    .populate('carrier', 'name logoUrl isVolumetric fuelSurcharge');
-  
-  // Calculate actual margin and filter by minimum margin if specified
-  const minMarginNum = parseFloat(minMargin);
-  const filteredRates = rates.filter(rate => {
-    const marginPercentage = ((rate.retailPrice - rate.purchasePrice) / rate.retailPrice) * 100;
-    return marginPercentage >= minMarginNum;
-  });
-  
-  // Sort by lowest retail price first
-  const sortedRates = filteredRates.sort((a, b) => a.retailPrice - b.retailPrice);
-  
-  res.status(200).json({
-    success: true,
-    count: sortedRates.length,
-    data: sortedRates
-  });
 });
 
 // @desc    Get single rate
