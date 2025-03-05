@@ -18,9 +18,24 @@ const app = express();
 // Middleware
 app.use(express.json());
 
-// In produzione, accettiamo tutte le origini per evitare problemi CORS con i vari deploy di Vercel
+// Configurazione CORS che accetta qualsiasi origine dal dominio vercel del frontend
 app.use(cors({
-  origin: ['https://sendcloud-pricing-tool-frontend-gjke7dc68.vercel.app', 'http://localhost:3000'], // Aggiungi l'URL specifico del tuo frontend su Vercel e localhost per lo sviluppo
+  origin: function(origin, callback) {
+    // Consenti richieste senza origine (come app mobile o Postman)
+    if (!origin) return callback(null, true);
+    
+    // Verifica se l'origine contiene il dominio base di Vercel
+    if (
+      origin.includes('sendcloud-pricing-tool-frontend.vercel.app') || 
+      origin === 'http://localhost:3000'
+    ) {
+      return callback(null, true);
+    }
+    
+    // Log delle origini rifiutate per debug
+    console.log('Origine CORS rifiutata:', origin);
+    callback(null, false);
+  },
   credentials: true
 }));
 
