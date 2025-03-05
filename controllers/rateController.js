@@ -298,26 +298,38 @@ exports.getRatesByCarrier = asyncHandler(async (req, res) => {
 exports.getWeightRangesByService = asyncHandler(async (req, res) => {
   const serviceId = req.params.serviceId;
   
-  if (!serviceId) {
-    res.status(400);
-    throw new Error('Service ID is required');
-  }
-  
   try {
-    // Verifica che il servizio esista
+    // Prima otteniamo il servizio specifico
     const service = await Service.findById(serviceId);
     
     if (!service) {
-      res.status(404);
-      throw new Error('Service not found');
+      return res.status(404).json({
+        success: false,
+        message: 'Service not found'
+      });
     }
     
-    // Trova tutte le tariffe per questo servizio
-    const rates = await Rate.find({ service: serviceId }).sort({ weightMin: 1 });
+    console.log(`Cercando tariffe per il servizio: ${service.name} (codice: ${service.code})`);
     
-    console.log(`Trovate ${rates.length} tariffe per il servizio ${serviceId}`);
+    // Otteniamo tutti i servizi con lo stesso nome/codice
+    const relatedServices = await Service.find({
+      $or: [
+        { name: service.name },
+        { code: service.code }
+      ]
+    });
     
-    // Trasforma nel formato richiesto
+    const serviceIds = relatedServices.map(s => s._id);
+    console.log(`Trovati ${serviceIds.length} servizi correlati`);
+    
+    // Ora cerchiamo tutte le rate associate a questi servizi
+    const rates = await Rate.find({
+      service: { $in: serviceIds }
+    }).sort({ weightMin: 1 });
+    
+    console.log(`Trovate ${rates.length} fasce di peso per i servizi correlati`);
+    
+    // Trasformiamo nel formato richiesto dal frontend
     const weightRanges = rates.map(rate => ({
       id: `${rate._id}`,
       label: `${rate.weightMin}-${rate.weightMax} kg`,
@@ -331,7 +343,7 @@ exports.getWeightRangesByService = asyncHandler(async (req, res) => {
       promotionDiscount: rate.promotionDiscount || 0
     }));
     
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       count: weightRanges.length,
       data: weightRanges
@@ -339,7 +351,10 @@ exports.getWeightRangesByService = asyncHandler(async (req, res) => {
     
   } catch (error) {
     console.error('Errore nel recupero delle fasce di peso:', error);
-    res.status(500);
-    throw new Error('Error retrieving weight ranges');
+    return res.status(500).json({
+      success: false,
+      message: 'Error retrieving weight ranges',
+      error: error.message
+    });
   }
 });
