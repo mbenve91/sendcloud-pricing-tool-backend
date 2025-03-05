@@ -18,7 +18,14 @@ const app = express();
 // Middleware
 app.use(express.json());
 app.use(cors({
-  origin: ['https://sendcloud-pricing-tool-frontend-51bdpbthg.vercel.app', 'http://localhost:3000'],
+  origin: function(origin, callback) {
+    // Accetta richieste da qualsiasi origine Vercel o dalle origini specificate
+    if (!origin || origin.endsWith('.vercel.app') || origin === 'http://localhost:3000') {
+      callback(null, true);
+    } else {
+      callback(new Error('Non permesso da CORS'));
+    }
+  },
   credentials: true
 }));
 
