@@ -20,7 +20,7 @@ app.use(express.json());
 
 // In produzione, accettiamo tutte le origini per evitare problemi CORS con i vari deploy di Vercel
 app.use(cors({
-  origin: true, // Accetta tutte le origini
+  origin: ['https://sendcloud-pricing-tool-frontend-gjke7dc68.vercel.app', 'http://localhost:3000'], // Aggiungi l'URL specifico del tuo frontend su Vercel e localhost per lo sviluppo
   credentials: true
 }));
 
