@@ -4,7 +4,20 @@ const Rate = loadModel('Rate');
 const Carrier = loadModel('Carrier');
 const asyncHandler = require('express-async-handler');
 const Service = require('../models/Service');
-const ErrorResponse = require('../utils/errorResponse');
+
+// Gestione del modulo ErrorResponse con fallback
+let ErrorResponse;
+try {
+  ErrorResponse = require('../utils/errorResponse');
+} catch (err) {
+  // Fallback: definisce una classe ErrorResponse di base se il modulo non è disponibile
+  ErrorResponse = class extends Error {
+    constructor(message, statusCode = 500) {
+      super(message);
+      this.statusCode = statusCode;
+    }
+  };
+}
 
 // Elenco di codici paesi EU
 const EU_COUNTRIES = ['AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 
