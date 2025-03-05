@@ -315,6 +315,8 @@ exports.getWeightRangesByService = asyncHandler(async (req, res) => {
     // Trova tutte le tariffe per questo servizio
     const rates = await Rate.find({ service: serviceId }).sort({ weightMin: 1 });
     
+    console.log(`Trovate ${rates.length} tariffe per il servizio ${serviceId}`);
+    
     // Trasforma nel formato richiesto
     const weightRanges = rates.map(rate => ({
       id: `${rate._id}`,
