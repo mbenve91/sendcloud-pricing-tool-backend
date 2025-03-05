@@ -18,7 +18,7 @@ const app = express();
 // Middleware
 app.use(express.json());
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'https://your-frontend-url.vercel.app',
+  origin: ['https://sendcloud-pricing-tool-frontend-51bdpbthg.vercel.app', 'http://localhost:3000'],
   credentials: true
 }));
 
