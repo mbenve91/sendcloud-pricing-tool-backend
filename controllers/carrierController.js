@@ -1,5 +1,12 @@
 // controllers/carrierController.js - Carrier CRUD operations
-const Carrier = require('../models/Carrier');
+let Carrier;
+try {
+  // Prima prova con il percorso standard (per ambiente locale)
+  Carrier = require('../models/Carrier.js');
+} catch (error) {
+  // Se fallisce, prova con il percorso assoluto (per ambiente Render)
+  Carrier = require(process.cwd() + '/models/Carrier.js');
+}
 const asyncHandler = require('express-async-handler');
 
 // @desc    Get all carriers
